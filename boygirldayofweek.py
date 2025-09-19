@@ -3,10 +3,11 @@ from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from collections import Counter
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from itertools import chain, product
 from random import randint, choice
-from textwrap import indent
+from textwrap import indent, dedent
 from time import time
 from typing import NamedTuple, Self, Iterator
 
@@ -216,20 +217,31 @@ def get_dataset(size):
     print()
     return dataset
 
-
+@dataclass
 class Run:
     """
     base class for a simulation running
     """
-
-    def __init__(self, dataset: Dataset, verbose: bool):
-        self.dataset = dataset
-        self.verbose = verbose
-        self.counts = None
+    dataset: Dataset
+    verbose: bool
+    histogram: bool
+    counts: bool = None
 
     @abstractmethod
     def run(self):
         pass
+
+    def print_header(self):
+        name = self.__class__.__name__
+        border = "=" * len(name)
+        print(dedent(
+            f"""\
+            {border}
+            {name}
+            {border}
+            """),
+              self.__doc__,
+              "\n-\n")
 
     def print_results(self, filtered, message):
         counts = filtered.count_by_genders
@@ -238,10 +250,10 @@ class Run:
         print(message,
               f"{round(boy_girl/total * 100, 2)}%\n\n boy/girl pairs: {boy_girl}, total: {total}")
 
-        if self.verbose:
-            print(" raw counts:")
+        if self.counts:
+            print("\n raw counts:")
             print(indent(str(filtered), "    "))
-        print()
+        print("\n-\n")
 
 
 class NoAdditionalInfo(Run):
@@ -392,7 +404,7 @@ class OneKnownGenderAndARandomDay(Run):
 
 class OneKnownGenderPlusRandomSelection(Run):
     """
-    Here I introduce a simple random number from 0 to 6 as an
+    Introduce a simple random number from 0 to 6 as an
     attribute of the child when it's created. Not only is the
     number assigned at birth randomly, but the number that
     determines whether we select the pair changes for every
@@ -445,6 +457,9 @@ def get_commandline() -> Namespace:
     parser.add_argument("--show-raw-counts", "--raw", "-r",
                         action="store_true",
                         help="show distribution of dataset generated")
+    parser.add_argument("--histogram", "--hist", "-H",
+                        action="store_true",
+                        help="show histogram of raw counts")
 
     return parser.parse_args()
 
@@ -466,12 +481,8 @@ def main():
             OneKnownGenderAndARandomDay,
             OneKnownGenderPlusRandomSelection,
     ):
-        action = run(dataset, args.show_raw_counts)
-        name = action.__class__.__name__
-        print(name)
-        print("=" * len(name))
-        print(run.__doc__)
-        print()
+        action = run(dataset, args.show_raw_counts, args.histogram)
+        action.print_header()
         action.run()
 
 
