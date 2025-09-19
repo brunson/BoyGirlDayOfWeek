@@ -1,6 +1,5 @@
-
-from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
+from abc import abstractmethod
 from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -71,25 +70,32 @@ class RandomDate:
             )
         )
 
+    def __repr__(self):
+        return self.dt.isoformat()
+
+DAYS: list[str] = "sun mon tue wed thu fri sat".split()
 
 class Child(NamedTuple):
     gender: str
-    birthday: datetime
+    birthdate: datetime
     rnum: int
     cointoss: str
-    days = "sun mon tue wed thu fri sat".split()
 
     @property
-    def birth_day(self):
-        return Child.days[self.birthday.dt.weekday()]
+    def birth_dow(self):
+        return self.birthdate.dt.strftime("%a").lower()
+
+    @property
+    def birthday(self):
+        return self.birthdate.dt.strftime("%d-%b")
 
     @property
     def birth_month(self):
-        return self.birthday.dt.strftime("%m")
+        return self.birthdate.dt.strftime("%m")
 
     @property
     def birth_year(self):
-        return self.birthday.dt.strftime("%Y")
+        return self.birthdate.dt.strftime("%Y")
 
 
 class Siblings:
@@ -101,7 +107,7 @@ class Siblings:
         self.two = self.make_a_baby()
 
     def __repr__(self):
-        return self.short_label
+        return f"""{self.one}\n{self.two}"""
 
     def make_a_baby(self):
         return Child(
@@ -141,8 +147,8 @@ class Dataset:
             self.generate(size)
 
     def __repr__(self) -> str:
-        return "\n".join(f"{key}: {val}" for (key, val)
-                         in self.count_by_label.items())
+        return dedent("\n".join(f"{key:>100}: {val}" for (key, val)
+                                in self.count_by_label.items()))
 
     def generate(self, size) -> None:
         self.dataset = [Siblings() for _ in range(0, size)]
@@ -177,16 +183,20 @@ class Dataset:
         return Counter(_.gender for _ in self.iter_individuals())
 
     @property
-    def count_by_birth_day(self) -> Counter:
-        return Counter(_.birth_day for _ in self.iter_individuals())
+    def count_by_birth_dow(self) -> Counter:
+        return Counter(_.birth_dow for _ in self.iter_individuals())
 
     @property
     def count_by_birth_month(self) -> Counter:
-        return Counter(_.birth_day for _ in self.iter_individuals())
+        return Counter(_.birth_month for _ in self.iter_individuals())
 
     @property
     def count_by_birth_year(self) -> Counter:
         return Counter(_.birth_year for _ in self.iter_individuals())
+
+    @property
+    def count_by_birthday(self) -> Counter:
+        return Counter(_.birthday for _ in self.iter_individuals())
 
     @property
     def count_by_rnum(self) -> Counter:
@@ -197,21 +207,14 @@ class Dataset:
         return Counter(_.cointoss for _ in self.iter_individuals())
 
 
-def show_stats(size) -> None:
+def show_stats(dataset: Dataset) -> None:
     """
     Generate random data sets and demonstrate valid distribution
     """
 
-    print(" ==== generating representative date set for statistics ====")
-    with timer():
-        years = Counter([RandomDate().dt.year for _ in range(0, size)])
     print("\n ==== shows distribution of randomly sampled dates over years\n",
-          histogram(years),
+          histogram(dataset.count_by_birth_year),
           "\n")
-
-    print(" ==== generating sibling set data ====")
-    with timer():
-        dataset = Dataset(size=size)
 
     print("\n ==== how are the generated sibling pairs distributed by genders\n",
           histogram(dataset.count_by_ordered_genders),
@@ -221,16 +224,20 @@ def show_stats(size) -> None:
           histogram(dataset.count_by_ind_gender),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth day of week\n",
-          histogram(dataset.count_by_birth_day),
+    print(" ==== how are the generated offspring distributed by birth year\n",
+          histogram(dataset.count_by_birth_year),
           "\n")
 
     print(" ==== how are the generated offspring distributed by birth month\n",
-          histogram(dataset.count_by_birth_day),
+          histogram(dataset.count_by_birth_month),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth year\n",
-          histogram(dataset.count_by_birth_year),
+    print(" ==== how are the generated offspring distributed by birth day of week\n",
+          histogram(dataset.count_by_birth_dow),
+          "\n")
+
+    print(" ==== how are the generated offspring distributed by birthday\n",
+          histogram(dataset.count_by_birthday),
           "\n")
 
     print(" ==== how are the generated offspring distributed by random number IaB\n",
@@ -250,17 +257,25 @@ def get_dataset(size):
     return dataset
 
 @dataclass
-class Run:
+class Simulation:
     """
     base class for a simulation running
     """
     dataset: Dataset
-    verbose: bool
-    histogram: bool
+    args: Namespace
+    formula: str = ""
+    expected: float = 0.0
     counts: Counter = None
+    percentages: list[float] = None
+
+    def run(self):
+        self.percentages = list()
+        self.print_header()
+        self.run_simulation()
+        self.print_footer()
 
     @abstractmethod
-    def run(self):
+    def run_simulation(self):
         pass
 
     def print_header(self):
@@ -279,47 +294,57 @@ class Run:
         counts = filtered.count_by_genders
         total = counts.total()
         boy_girl = counts[("boy", "girl")]
+        self.percentages.append(boy_girl/total)
         print(message,
               f"{round(boy_girl/total * 100, 2)}%\n boy/girl pairs: {boy_girl}, total: {total}")
 
-        if self.verbose:
-            print("\n raw counts:")
-            print(indent(str(filtered), "    "))
+        if self.args.raw_counts or self.args.verbose:
+            print("\n raw counts")
+            print(indent(str(filtered), "  "))
 
-        if self.histogram:
+        if self.args.histogram or self.args.verbose:
             print(f"\n{histogram(filtered.count_by_label)}")
-            # print(indent(str(filtered), "    "))
 
         print("\n-\n")
 
+    def print_footer(self):
+        average = round(sum(self.percentages) / len(self.percentages) * 100, 2)
+        print(f"average of all the probabilities is {average}%")
+        print(f"the expected value is {self.formula} or {self.expected}%\n\n----\n")
 
-class NoAdditionalInfo(Run):
+
+class NoAdditionalInfo(Simulation):
     """
-    The simplest case, shows that the chance of any random set
-    of two siblings being different genders is 1/2
+    The simplest case, shows that the chance of any random set of
+    two siblings being different genders is 1/2
+
     """
 
-    def run(self):
-        for known, other in (("boy", "girl"), ("girl", "boy")):
-            print(f"I have two children, one is a {known}")
-            filtered = self.dataset.filter(lambda _: known in _.ordered_genders)
+    def __post_init__(self):
+        self.formula = "1/2"
+        self.expected = 1/2
 
-            self.print_results(
-                filtered,
-                f"probability my other child is a {other} is"
-            )
+    def run_simulation(self):
+        print(f"I have two children")
+        filtered = self.dataset
+
+        self.print_results(
+            filtered,
+            f"probability I have a boy and a girl is"
+        )
 
 
-class OneKnownGender(Run):
+class OneKnownGender(Simulation):
     """
     Demonstrate that when we're given the gender of one of them
-    siblings we can filter the dataset of any genders that do not
-    have at least one sibling of that gender.
-    If one is a girl, then two boys is not possible
-    The chance of having two different genders goes to 2/3
+    siblings we can filter the dataset of any genders that do not have
+    at least one sibling of that gender.  If one is a girl, then two
+    boys is not possible The chance of having two different genders
+    goes to 2/3
+
     """
 
-    def run(self):
+    def run_simulation(self):
         for known, other in (("boy", "girl"), ("girl", "boy")):
             print(f"I have two children, one is a {known}")
             filtered = self.dataset.filter(lambda _: known in _.ordered_genders)
@@ -330,24 +355,27 @@ class OneKnownGender(Run):
             )
 
 
-class OneKnownGenderAndDayOfBirth(Run):
+class OneKnownGenderAndDayOfBirth(Simulation):
     """
-    The contentious case: When we use the day of the week of the
-    sibling who's gender is known, we filter out all pairs that
-    do not include one child of that gender born on that day.
+    The contentious case:
+
+    When we use the gender combined with the day of the week of the
+    day of the week they were born, we filter out all pairs that do
+    not include one child of that gender born on that day.
 
     If there's a girl born on a Tuesday then all pairs that do not
     include a girl born on a Tuesday are removed from our dataset.
     Chance of two different genders DROPS to 14/27 (51.85%)
+
     """
 
-    def run(self):
-        for known, day, other in product(("boy", "girl"), Child.days, ("girl", "boy")):
+    def run_simulation(self):
+        for known, day, other in product(("boy", "girl"), DAYS, ("girl", "boy")):
             print(f"I have two children, one is a {known} born on a {day}")
             filtered = self.dataset.filter(
                 lambda _: (
-                    (known, day) in ((_.one.gender, _.one.birth_day),
-                                     (_.two.gender, _.two.birth_day))
+                    (known, day) in ((_.one.gender, _.one.birth_dow),
+                                     (_.two.gender, _.two.birth_dow))
                 )
             )
             self.print_results(
@@ -356,20 +384,21 @@ class OneKnownGenderAndDayOfBirth(Run):
             )
 
 
-class DayOfBirth(Run):
+class DayOfBirth(Simulation):
     """
-    Demonstrate that simply filtering by one of the siblings having
-    been born on a given day of the week does not change the event
-    distribution of the gender pairs. It simply reduces the number
-    of pairs in our dataset
+    Demonstrate that simply filtering by one of the siblings
+    having been born on a given day of the week does not change the
+    event distribution of the gender pairs. It simply reduces the
+    number of pairs in our dataset
+
     """
 
-    def run(self):
-        for day in Child.days:
+    def run_simulation(self):
+        for day in DAYS:
             print(f"I have two children, one is born on a {day}")
             filtered = self.dataset.filter(
                 lambda _: (
-                    day in (_.one.birth_day, _.two.birth_day)
+                    day in (_.one.birth_dow, _.two.birth_dow)
                 )
             )
             self.print_results(
@@ -378,21 +407,22 @@ class DayOfBirth(Run):
             )
 
 
-class DayOfBirthFirstThenKnownGender(Run):
+class DayOfBirthFirstThenKnownGender(Simulation):
     """
     Filter first by day of birth, then in a second step apply them
     known gender criteria to show that after those two steps them
-    probability of boy/girl siblings is 2/3. Thus, knowing the day
-    of birth along with the gender of one child adds no useful
+    probability of boy/girl siblings is 2/3. Thus, knowing the day of
+    birth along with the gender of one child adds no useful
     information
+
     """
 
-    def run(self):
-        for day in Child.days:
+    def run_simulation(self):
+        for day in DAYS:
             print(f"I have two children, one is born on a {day}, filtering...", end=" ")
             filtered = self.dataset.filter(
                 lambda _: (
-                    day in (_.one.birth_day, _.two.birth_day)
+                    day in (_.one.birth_dow, _.two.birth_dow)
                 )
             )
             print("done")
@@ -411,26 +441,26 @@ class DayOfBirthFirstThenKnownGender(Run):
             )
 
 
-class OneKnownGenderAndARandomDay(Run):
+class OneKnownGenderAndARandomDay(Simulation):
     """
-    In this simulation we filter based on a given known gender, but
-    for each set of siblings we generate a random day of the week
+    In this simulation we filter based on a given known gender,
+    but for each set of siblings we generate a random day of the week
     and select that pair based on it having a child of the given
-    gender and the random day of the week we generate for every
-    pair.
+    gender and the random day of the week we generate for every pair.
 
     This presents the same 14/27 chance as filtering based on day
     of the week born, but doesn't carry the cognitive bias of all
     the known gender children being born on the same day
+
     """
 
-    def run(self):
+    def run_simulation(self):
         for known, other in product(("boy", "girl"), ("girl", "boy")):
             print(f"I have two children, one is a {known} born on a random day")
             filtered = self.dataset.filter(
                 lambda _: (
-                    (known, choice(Child.days)) in ((_.one.gender, _.one.birth_day),
-                                                    (_.two.gender, _.two.birth_day))
+                    (known, choice(DAYS)) in ((_.one.gender, _.one.birth_dow),
+                                              (_.two.gender, _.two.birth_dow))
                 )
             )
             self.print_results(
@@ -439,13 +469,12 @@ class OneKnownGenderAndARandomDay(Run):
             )
 
 
-class OneKnownGenderPlusRandomSelection(Run):
+class OneKnownGenderPlusRandomSelection(Simulation):
     """
-    Introduce a simple random number from 0 to 6 as an
-    attribute of the child when it's created. Not only is the
-    number assigned at birth randomly, but the number that
-    determines whether we select the pair changes for every
-    set of siblings.
+    Introduce a simple random number from 0 to 6 as an attribute
+    of the child when it's created. Not only is the number assigned at
+    birth randomly, but the number that determines whether we select
+    the pair changes for every set of siblings.
 
     This case shows that filtering on a random number while
     maintaining the select bias of preserving more of the same
@@ -458,9 +487,10 @@ class OneKnownGenderPlusRandomSelection(Run):
     to select either or both of the children, because it makes
     it twice as likely to select that pair, thus altering the
     ratio when compared to the total paris in the dataset
+
     """
 
-    def run(self):
+    def run_simulation(self):
         def random_number(choices=list(range(0, 7))):
             return choice(choices)
 
@@ -481,14 +511,15 @@ class OneKnownGenderPlusRandomSelection(Run):
             )
 
 
-class OneKnownGenderPlusCoinToss(Run):
+class OneKnownGenderPlusCoinToss(Simulation):
     """
-    Introduce a coin toss as attribute of the child when
-    it's created. I tossed a coin when each of my kids was
-    born and tattooed it on their forehead
+    Introduce a coin toss as attribute of the child when it's
+    created. I tossed a coin when each of my kids was born and
+    tattooed it on their forehead
+
     """
 
-    def run(self):
+    def run_simulation(self):
         for known, coin, other in product(("boy", "girl"), ("heads", "tails"), ("girl", "boy")):
             print(f"I have two children, one is a {known} and their coin toss was {coin}")
             filtered = self.dataset.filter(
@@ -504,16 +535,16 @@ class OneKnownGenderPlusCoinToss(Run):
             )
 
 
-class OneKnownGenderPlusRandomCoinToss(Run):
+class OneKnownGenderPlusRandomCoinToss(Simulation):
     """
-    Same coin toss, but a random coin toss is generated
-    every time we select a sibling pair. So, for each
-    pair of siblings toss a coin and keep the pair if
-    either child is of the opposite gender and matches
-    the coin that was just tossed.
+    Same coin toss, but a random coin toss is generated every time
+    we select a sibling pair. So, for each pair of siblings toss a
+    coin and keep the pair if either child is of the opposite gender
+    and matches the coin that was just tossed.
+
     """
 
-    def run(self):
+    def run_simulation(self):
         def flip_a_coin(choices="heads tails".split()):
             return choice(choices)
 
@@ -545,25 +576,30 @@ def get_commandline() -> Namespace:
                         type=int,
                         default=1_000_000,
                         help="size of random dataset to generate")
-    parser.add_argument("--show-raw-counts", "--raw", "-r",
+    parser.add_argument("--raw-counts", "--raw", "-r",
                         action="store_true",
                         help="show distribution of dataset generated")
     parser.add_argument("--histogram", "--hist", "-H",
                         action="store_true",
                         help="show histogram of raw counts")
-
+    parser.add_argument("--verbose", "-v",
+                        action="store_true",
+                        help="generate all output")
     return parser.parse_args()
 
 
 def main():
     args = get_commandline()
 
+    dataset = get_dataset(args.dataset_size)
+
+    if args.stats or args.verbose:
+        show_stats(dataset)
+
     if args.stats:
-        show_stats(args.dataset_size)
         raise SystemExit
 
-    dataset = get_dataset(args.dataset_size)
-    for run in (
+    for simulation in (
             NoAdditionalInfo,
             OneKnownGender,
             OneKnownGenderAndDayOfBirth,
@@ -574,9 +610,7 @@ def main():
             OneKnownGenderPlusCoinToss,
             OneKnownGenderPlusRandomCoinToss,
     ):
-        action = run(dataset, args.show_raw_counts, args.histogram)
-        action.print_header()
-        action.run()
+        simulation(dataset, args).run()
 
 
 if __name__ == "__main__":
