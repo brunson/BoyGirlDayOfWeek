@@ -1,3 +1,6 @@
+
+import pickle
+
 from argparse import ArgumentParser, Namespace
 from abc import abstractmethod
 from collections import Counter
@@ -5,10 +8,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import chain, product
+from pathlib import Path
 from random import randint, choice
 from textwrap import indent, dedent
 from time import time
-from typing import NamedTuple, Self, Iterator
+from typing import Self, Iterator
+
+
+DAYS: list[str] = "sun mon tue wed thu fri sat".split()
 
 
 def histogram(data: Counter) -> None:
@@ -28,25 +35,27 @@ def histogram(data: Counter) -> None:
     lines.append(f"{count:,} data points")
 
     for key in sorted(data.keys()):
-        lines.append(f" {str(key):>{key_width}}: [{data[key]:>{count_width}}] {'*' * (data[key]//norm)}")
+        lines.append(f" {str(key):>{key_width}}: [{data[key]:>{count_width}}] "
+                     f"{'*' * (data[key]//norm)}")
 
     output = "\n".join(lines)
     return output
 
 
 @contextmanager
-def timer():
+def timer(message="{} seconds elapsed", wait=False):
     """
     context manager to time operations and display duration
     """
 
     start = time()
-    print("   == timing... ", end="", flush=True)
+    print("   == timing... ", end="" if wait else "\n", flush=True)
 
     yield
 
     elapsed = round(time() - start)
-    print(f"{elapsed} seconds elapsed ==")
+    print(message.format(elapsed))
+    print()
 
 
 class RandomDate:
@@ -73,29 +82,22 @@ class RandomDate:
     def __repr__(self):
         return self.dt.isoformat()
 
-DAYS: list[str] = "sun mon tue wed thu fri sat".split()
 
-class Child(NamedTuple):
+class Child:
     gender: str
     birthdate: datetime
     rnum: int
     cointoss: str
 
-    @property
-    def birth_dow(self):
-        return self.birthdate.dt.strftime("%a").lower()
-
-    @property
-    def birthday(self):
-        return self.birthdate.dt.strftime("%d-%b")
-
-    @property
-    def birth_month(self):
-        return self.birthdate.dt.strftime("%m")
-
-    @property
-    def birth_year(self):
-        return self.birthdate.dt.strftime("%Y")
+    def __init__(self, gender, birthdate, rnum, cointoss):
+        self.gender = gender
+        self.birthdate = birthdate
+        self.rnum = rnum
+        self.cointoss = cointoss
+        self.birth_dow = birthdate.dt.strftime("%a").lower()
+        self.birthday = birthdate.dt.strftime("%d-%b")
+        self.birth_month = birthdate.dt.strftime("%m")
+        self.birth_year = birthdate.dt.strftime("%Y")
 
 
 class Siblings:
@@ -105,9 +107,17 @@ class Siblings:
     def __init__(self):
         self.one = self.make_a_baby()
         self.two = self.make_a_baby()
+        self.ordered_genders = (self.one.gender, self.two.gender)
+        self.sorted_genders = tuple(sorted(self.ordered_genders))
+        self.label = f"{self.one.gender}/{self.two.gender}"
+        self.short_label = f"{self.one.gender[0]}/{self.two.gender[0]}"
 
     def __repr__(self):
         return f"""{self.one}\n{self.two}"""
+
+    @property
+    def random_gender(self) -> str:
+        return choice(self.ordered_genders)
 
     def make_a_baby(self):
         return Child(
@@ -116,26 +126,6 @@ class Siblings:
             choice(self.choices),
             choice(["heads", "tails"]),
         )
-
-    @property
-    def ordered_genders(self) -> tuple[str, str]:
-        return (self.one.gender, self.two.gender)
-
-    @property
-    def sorted_genders(self) -> tuple[str, str]:
-        return tuple(sorted((self.one.gender, self.two.gender)))
-
-    @property
-    def random_gender(self) -> str:
-        return choice(self.ordered_genders)
-
-    @property
-    def label(self):
-        return f"{self.one.gender}/{self.two.gender}"
-
-    @property
-    def short_label(self):
-        return f"{self.one.gender[0]}/{self.two.gender[0]}"
 
 
 class Dataset:
@@ -249,12 +239,29 @@ def show_stats(dataset: Dataset) -> None:
           "\n")
 
 
-def get_dataset(size):
-    print(" ==== generating dataset =====")
-    with timer():
-        dataset = Dataset(size=size)
+def get_dataset(
+        size: int,
+        regen: bool = False,
+        cache: bool = True
+) -> Dataset:
+    cache = Path("~/.boygirl.cached").expanduser()
+
+    if cache.exists() and not regen:
+        print(" ==== reading cached dataset =====")
+        with timer("cached dataset loaded in {} seconds"):
+            dataset = pickle.load(cache.open("rb"))
+    else:
+        print(" ==== generating dataset =====")
+        with timer("dataset generated in {} seconds"):
+            dataset = Dataset(size=size)
+
+        if cache:
+            with timer("dataset saved in {} seconds"):
+                pickle.dump(dataset, cache.open("wb"))
+
     print()
     return dataset
+
 
 @dataclass
 class Simulation:
@@ -574,7 +581,7 @@ def get_commandline() -> Namespace:
                         help="show distribution of dataset generated")
     parser.add_argument("--dataset-size", "--size", "-s",
                         type=int,
-                        default=1_000_000,
+                        default=100_000,
                         help="size of random dataset to generate")
     parser.add_argument("--raw-counts", "--raw", "-r",
                         action="store_true",
@@ -585,19 +592,25 @@ def get_commandline() -> Namespace:
     parser.add_argument("--verbose", "-v",
                         action="store_true",
                         help="generate all output")
+    parser.add_argument("--regenerate-cache", "--regen", "-R",
+                        action="store_true",
+                        help="regenerate cache")
+    parser.add_argument("--show-timings", "--timer", "-T",
+                        action="store_true",
+                        help="regenerate cache")
+
     return parser.parse_args()
 
 
 def main():
     args = get_commandline()
 
-    dataset = get_dataset(args.dataset_size)
+    dataset = get_dataset(args.dataset_size, args.regenerate_cache)
 
     if args.stats or args.verbose:
         show_stats(dataset)
-
-    if args.stats:
-        raise SystemExit
+        if args.stats:
+            raise SystemExit
 
     for simulation in (
             NoAdditionalInfo,
@@ -610,7 +623,11 @@ def main():
             OneKnownGenderPlusCoinToss,
             OneKnownGenderPlusRandomCoinToss,
     ):
-        simulation(dataset, args).run()
+        if args.show_timings:
+            with timer():
+                simulation(dataset, args).run()
+        else:
+            simulation(dataset, args).run()
 
 
 if __name__ == "__main__":
