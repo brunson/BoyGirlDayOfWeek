@@ -152,6 +152,14 @@ class Dataset:
         return Dataset(data=filtered)
 
     @property
+    def count_by_label(self) -> Counter:
+        return Counter(_.label for _ in self.dataset)
+
+    @property
+    def count_by_short_label(self) -> Counter:
+        return Counter(_.short_label for _ in self.dataset)
+
+    @property
     def count_by_ordered_genders(self) -> Counter:
         return Counter(sibs.label for sibs in self.dataset)
 
@@ -181,12 +189,12 @@ class Dataset:
         return Counter(_.birth_year for _ in self.iter_individuals())
 
     @property
-    def count_by_label(self) -> Counter:
-        return Counter(_.label for _ in self.dataset)
+    def count_by_rnum(self) -> Counter:
+        return Counter(_.rnum for _ in self.iter_individuals())
 
     @property
-    def count_by_short_label(self) -> Counter:
-        return Counter(_.short_label for _ in self.dataset)
+    def count_by_coin_toss(self) -> Counter:
+        return Counter(_.cointoss for _ in self.iter_individuals())
 
 
 def show_stats(size) -> None:
@@ -197,7 +205,7 @@ def show_stats(size) -> None:
     print(" ==== generating representative date set for statistics ====")
     with timer():
         years = Counter([RandomDate().dt.year for _ in range(0, size)])
-    print("\n ==== shows distribution of randomly sampled dates over years ====",
+    print("\n ==== shows distribution of randomly sampled dates over years\n",
           histogram(years),
           "\n")
 
@@ -205,24 +213,32 @@ def show_stats(size) -> None:
     with timer():
         dataset = Dataset(size=size)
 
-    print("\n ==== how are the generated sibling pairs distributed by genders",
+    print("\n ==== how are the generated sibling pairs distributed by genders\n",
           histogram(dataset.count_by_ordered_genders),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by gender",
+    print(" ==== how are the generated offspring distributed by gender\n",
           histogram(dataset.count_by_ind_gender),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth day of week",
+    print(" ==== how are the generated offspring distributed by birth day of week\n",
           histogram(dataset.count_by_birth_day),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth month",
+    print(" ==== how are the generated offspring distributed by birth month\n",
           histogram(dataset.count_by_birth_day),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth year",
+    print(" ==== how are the generated offspring distributed by birth year\n",
           histogram(dataset.count_by_birth_year),
+          "\n")
+
+    print(" ==== how are the generated offspring distributed by random number IaB\n",
+          histogram(dataset.count_by_rnum),
+          "\n")
+
+    print(" ==== how are the generated offspring distributed by coin toss IaB\n",
+          histogram(dataset.count_by_coin_toss),
           "\n")
 
 
