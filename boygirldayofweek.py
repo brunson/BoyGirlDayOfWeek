@@ -1,4 +1,3 @@
-
 import pickle
 
 from argparse import ArgumentParser, Namespace
@@ -138,7 +137,7 @@ class Dataset:
 
     def __repr__(self) -> str:
         return dedent("\n".join(f"{key:>100}: {val}" for (key, val)
-                                in self.count_by_label.items()))
+                                in self.count_by_label().items()))
 
     def generate(self, size) -> None:
         self.dataset = [Siblings() for _ in range(0, size)]
@@ -147,19 +146,15 @@ class Dataset:
         filtered = [_ for _ in self.dataset if filter_func(_)]
         return Dataset(data=filtered)
 
-    @property
     def count_by_label(self) -> Counter:
         return Counter(_.label for _ in self.dataset)
 
-    @property
     def count_by_short_label(self) -> Counter:
         return Counter(_.short_label for _ in self.dataset)
 
-    @property
     def count_by_ordered_genders(self) -> Counter:
         return Counter(sibs.label for sibs in self.dataset)
 
-    @property
     def count_by_genders(self) -> Counter:
         return Counter(_.sorted_genders for _ in self.dataset)
 
@@ -168,31 +163,24 @@ class Dataset:
         two = (sibs.two for sibs in self.dataset)
         return chain(one, two)
 
-    @property
     def count_by_ind_gender(self) -> Counter:
         return Counter(_.gender for _ in self.iter_individuals())
 
-    @property
     def count_by_birth_dow(self) -> Counter:
         return Counter(_.birth_dow for _ in self.iter_individuals())
 
-    @property
     def count_by_birth_month(self) -> Counter:
         return Counter(_.birth_month for _ in self.iter_individuals())
 
-    @property
     def count_by_birth_year(self) -> Counter:
         return Counter(_.birth_year for _ in self.iter_individuals())
 
-    @property
     def count_by_birthday(self) -> Counter:
         return Counter(_.birthday for _ in self.iter_individuals())
 
-    @property
     def count_by_rnum(self) -> Counter:
         return Counter(_.rnum for _ in self.iter_individuals())
 
-    @property
     def count_by_coin_toss(self) -> Counter:
         return Counter(_.cointoss for _ in self.iter_individuals())
 
@@ -203,39 +191,39 @@ def show_stats(dataset: Dataset) -> None:
     """
 
     print("\n ==== shows distribution of randomly sampled dates over years\n",
-          histogram(dataset.count_by_birth_year),
+          histogram(dataset.count_by_birth_year()),
           "\n")
 
     print("\n ==== how are generated sibling pairs distributed by genders\n",
-          histogram(dataset.count_by_ordered_genders),
+          histogram(dataset.count_by_ordered_genders()),
           "\n")
 
     print("\n ==== how are generated offspring distributed by gender\n",
-          histogram(dataset.count_by_ind_gender),
+          histogram(dataset.count_by_ind_gender()),
           "\n")
 
     print(" ==== how are generated offspring distributed by birth year\n",
-          histogram(dataset.count_by_birth_year),
+          histogram(dataset.count_by_birth_year()),
           "\n")
 
     print(" ==== how are generated offspring distributed by birth month\n",
-          histogram(dataset.count_by_birth_month),
+          histogram(dataset.count_by_birth_month()),
           "\n")
 
     print(" ==== how are generated offspring distributed by day of week\n",
-          histogram(dataset.count_by_birth_dow),
+          histogram(dataset.count_by_birth_dow()),
           "\n")
 
     print(" ==== how are generated offspring distributed by birthday\n",
-          histogram(dataset.count_by_birthday),
+          histogram(dataset.count_by_birthday()),
           "\n")
 
     print(" ==== how are generated offspring distributed by rand number IaB\n",
-          histogram(dataset.count_by_rnum),
+          histogram(dataset.count_by_rnum()),
           "\n")
 
     print(" ==== how are generated offspring distributed by coin toss IaB\n",
-          histogram(dataset.count_by_coin_toss),
+          histogram(dataset.count_by_coin_toss()),
           "\n")
 
 
@@ -298,7 +286,7 @@ class Simulation:
         print("-\n")
 
     def print_results(self, filtered, message):
-        counts = filtered.count_by_genders
+        counts = filtered.count_by_genders()
         total = counts.total()
         boy_girl = counts[("boy", "girl")]
         self.percentages.append(boy_girl/total)
@@ -311,7 +299,7 @@ class Simulation:
             print(indent(str(filtered), "  "))
 
         if self.args.histogram or self.args.verbose:
-            print(f"\n{histogram(filtered.count_by_label)}")
+            print(f"\n{histogram(filtered.count_by_label())}")
 
         print("\n-\n")
 
