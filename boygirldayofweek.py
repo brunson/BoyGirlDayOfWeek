@@ -25,12 +25,14 @@ def histogram(data: Counter) -> None:
     num_keys = len(data)
     norm = max((count // num_keys // bar_width, display_width))
 
-    print(f"{count:,} data points")
+    lines = list()
+    lines.append(f"{count:,} data points")
 
     for key in sorted(data.keys()):
-        print(f" {str(key):>{key_width}}: [{data[key]:>{count_width}}] {'*' * (data[key]//norm)}")
+        lines.append(f" {str(key):>{key_width}}: [{data[key]:>{count_width}}] {'*' * (data[key]//norm)}")
 
-    print()
+    output = "\n".join(lines)
+    return output
 
 
 @contextmanager
@@ -140,7 +142,7 @@ class Dataset:
 
     def __repr__(self) -> str:
         return "\n".join(f"{key}: {val}" for (key, val)
-                         in Counter(_.short_label for _ in self.dataset).items())
+                         in self.count_by_label.items())
 
     def generate(self, size) -> None:
         self.dataset = [Siblings() for _ in range(0, size)]
@@ -178,8 +180,16 @@ class Dataset:
     def count_by_birth_year(self) -> Counter:
         return Counter(_.birth_year for _ in self.iter_individuals())
 
+    @property
+    def count_by_label(self) -> Counter:
+        return Counter(_.label for _ in self.dataset)
 
-def stats(size) -> None:
+    @property
+    def count_by_short_label(self) -> Counter:
+        return Counter(_.short_label for _ in self.dataset)
+
+
+def show_stats(size) -> None:
     """
     Generate random data sets and demonstrate valid distribution
     """
@@ -187,27 +197,33 @@ def stats(size) -> None:
     print(" ==== generating representative date set for statistics ====")
     with timer():
         years = Counter([RandomDate().dt.year for _ in range(0, size)])
-    print("\n ==== shows distribution of randomly sampled dates over years ====")
-    histogram(years)
+    print("\n ==== shows distribution of randomly sampled dates over years ====",
+          histogram(years),
+          "\n")
 
     print(" ==== generating sibling set data ====")
     with timer():
         dataset = Dataset(size=size)
 
-    print("\n ==== how are the generated sibling pairs distributed by genders")
-    histogram(dataset.count_by_ordered_genders)
+    print("\n ==== how are the generated sibling pairs distributed by genders",
+          histogram(dataset.count_by_ordered_genders),
+          "\n")
 
-    print(" ==== how are the generated offspring distributed by gender")
-    histogram(dataset.count_by_ind_gender)
+    print(" ==== how are the generated offspring distributed by gender",
+          histogram(dataset.count_by_ind_gender),
+          "\n")
 
-    print(" ==== how are the generated offspring distributed by birth day of week")
-    histogram(dataset.count_by_birth_day)
+    print(" ==== how are the generated offspring distributed by birth day of week",
+          histogram(dataset.count_by_birth_day),
+          "\n")
 
-    print(" ==== how are the generated offspring distributed by birth month")
-    histogram(dataset.count_by_birth_day)
+    print(" ==== how are the generated offspring distributed by birth month",
+          histogram(dataset.count_by_birth_day),
+          "\n")
 
-    print(" ==== how are the generated offspring distributed by birth year")
-    histogram(dataset.count_by_birth_year)
+    print(" ==== how are the generated offspring distributed by birth year",
+          histogram(dataset.count_by_birth_year),
+          "\n")
 
 
 def get_dataset(size):
@@ -225,7 +241,7 @@ class Run:
     dataset: Dataset
     verbose: bool
     histogram: bool
-    counts: bool = None
+    counts: Counter = None
 
     @abstractmethod
     def run(self):
@@ -234,25 +250,30 @@ class Run:
     def print_header(self):
         name = self.__class__.__name__
         border = "=" * len(name)
-        print(dedent(
-            f"""\
+        print(f"""\
             {border}
             {name}
             {border}
-            """),
-              self.__doc__,
-              "\n-\n")
+            """,
+            self.__doc__
+        )
+        print("-\n")
 
     def print_results(self, filtered, message):
         counts = filtered.count_by_genders
         total = counts.total()
         boy_girl = counts[("boy", "girl")]
         print(message,
-              f"{round(boy_girl/total * 100, 2)}%\n\n boy/girl pairs: {boy_girl}, total: {total}")
+              f"{round(boy_girl/total * 100, 2)}%\n boy/girl pairs: {boy_girl}, total: {total}")
 
-        if self.counts:
+        if self.verbose:
             print("\n raw counts:")
             print(indent(str(filtered), "    "))
+
+        if self.histogram:
+            print(f"\n{histogram(filtered.count_by_label)}")
+            # print(indent(str(filtered), "    "))
+
         print("\n-\n")
 
 
@@ -468,7 +489,7 @@ def main():
     args = get_commandline()
 
     if args.stats:
-        stats(args.dataset_size)
+        show_stats(args.dataset_size)
         raise SystemExit
 
     dataset = get_dataset(args.dataset_size)
