@@ -206,35 +206,35 @@ def show_stats(dataset: Dataset) -> None:
           histogram(dataset.count_by_birth_year),
           "\n")
 
-    print("\n ==== how are the generated sibling pairs distributed by genders\n",
+    print("\n ==== how are generated sibling pairs distributed by genders\n",
           histogram(dataset.count_by_ordered_genders),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by gender\n",
+    print("\n ==== how are generated offspring distributed by gender\n",
           histogram(dataset.count_by_ind_gender),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth year\n",
+    print(" ==== how are generated offspring distributed by birth year\n",
           histogram(dataset.count_by_birth_year),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth month\n",
+    print(" ==== how are generated offspring distributed by birth month\n",
           histogram(dataset.count_by_birth_month),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birth day of week\n",
+    print(" ==== how are generated offspring distributed by day of week\n",
           histogram(dataset.count_by_birth_dow),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by birthday\n",
+    print(" ==== how are generated offspring distributed by birthday\n",
           histogram(dataset.count_by_birthday),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by random number IaB\n",
+    print(" ==== how are generated offspring distributed by rand number IaB\n",
           histogram(dataset.count_by_rnum),
           "\n")
 
-    print(" ==== how are the generated offspring distributed by coin toss IaB\n",
+    print(" ==== how are generated offspring distributed by coin toss IaB\n",
           histogram(dataset.count_by_coin_toss),
           "\n")
 
@@ -303,7 +303,8 @@ class Simulation:
         boy_girl = counts[("boy", "girl")]
         self.percentages.append(boy_girl/total)
         print(message,
-              f"{round(boy_girl/total * 100, 2)}%\n boy/girl pairs: {boy_girl}, total: {total}")
+              f"{round(boy_girl/total * 100, 2)}%\n boy/girl pairs: "
+              f"{boy_girl}, total: {total}")
 
         if self.args.raw_counts or self.args.verbose:
             print("\n raw counts")
@@ -317,7 +318,8 @@ class Simulation:
     def print_footer(self):
         average = round(sum(self.percentages) / len(self.percentages) * 100, 2)
         print(f"average of all the probabilities is {average}%")
-        print(f"the expected value is {self.formula} or {self.expected}%\n\n----\n")
+        print(f"the expected value is {self.formula} or "
+              f"{self.expected}%\n\n----\n")
 
 
 class NoAdditionalInfo(Simulation):
@@ -332,12 +334,12 @@ class NoAdditionalInfo(Simulation):
         self.expected = 1/2
 
     def run_simulation(self):
-        print(f"I have two children")
+        print("I have two children")
         filtered = self.dataset
 
         self.print_results(
             filtered,
-            f"probability I have a boy and a girl is"
+            "probability I have a boy and a girl is"
         )
 
 
@@ -354,7 +356,9 @@ class OneKnownGender(Simulation):
     def run_simulation(self):
         for known, other in (("boy", "girl"), ("girl", "boy")):
             print(f"I have two children, one is a {known}")
-            filtered = self.dataset.filter(lambda _: known in _.ordered_genders)
+            filtered = self.dataset.filter(
+                lambda _: known in _.ordered_genders
+            )
 
             self.print_results(
                 filtered,
@@ -377,7 +381,9 @@ class OneKnownGenderAndDayOfBirth(Simulation):
     """
 
     def run_simulation(self):
-        for known, day, other in product(("boy", "girl"), DAYS, ("girl", "boy")):
+        for known, day, other in product(("boy", "girl"),
+                                         DAYS,
+                                         ("girl", "boy")):
             print(f"I have two children, one is a {known} born on a {day}")
             filtered = self.dataset.filter(
                 lambda _: (
@@ -426,7 +432,8 @@ class DayOfBirthFirstThenKnownGender(Simulation):
 
     def run_simulation(self):
         for day in DAYS:
-            print(f"I have two children, one is born on a {day}, filtering...", end=" ")
+            print(f"I have two children, one is born on a {day}, filtering...",
+                  end=" ")
             filtered = self.dataset.filter(
                 lambda _: (
                     day in (_.one.birth_dow, _.two.birth_dow)
@@ -463,7 +470,8 @@ class OneKnownGenderAndARandomDay(Simulation):
 
     def run_simulation(self):
         for known, other in product(("boy", "girl"), ("girl", "boy")):
-            print(f"I have two children, one is a {known} born on a random day")
+            print(f"I have two children, one is a {known} "
+                  "born on a random day")
             filtered = self.dataset.filter(
                 lambda _: (
                     (known, choice(DAYS)) in ((_.one.gender, _.one.birth_dow),
@@ -527,8 +535,11 @@ class OneKnownGenderPlusCoinToss(Simulation):
     """
 
     def run_simulation(self):
-        for known, coin, other in product(("boy", "girl"), ("heads", "tails"), ("girl", "boy")):
-            print(f"I have two children, one is a {known} and their coin toss was {coin}")
+        for known, coin, other in product(("boy", "girl"),
+                                          ("heads", "tails"),
+                                          ("girl", "boy")):
+            print(f"I have two children, one is a {known} and their "
+                  f"coin toss was {coin}")
             filtered = self.dataset.filter(
                 lambda _, known=known, coin=coin:
                 (known, coin) in (
