@@ -76,7 +76,7 @@ class Child(NamedTuple):
     gender: str
     birthday: datetime
     rnum: int
-    coinflip: str
+    cointoss: str
     days = "sun mon tue wed thu fri sat".split()
 
     @property
@@ -465,6 +465,60 @@ class OneKnownGenderPlusRandomSelection(Run):
             )
 
 
+class OneKnownGenderPlusCoinToss(Run):
+    """
+    Introduce a coin toss as attribute of the child when
+    it's created. I tossed a coin when each of my kids was
+    born and tattooed it on their forehead
+    """
+
+    def run(self):
+        for known, coin, other in product(("boy", "girl"), ("heads", "tails"), ("girl", "boy")):
+            print(f"I have two children, one is a {known} and their coin toss was {coin}")
+            filtered = self.dataset.filter(
+                lambda _, known=known, coin=coin:
+                (known, coin) in (
+                    (_.one.gender, _.one.cointoss),
+                    (_.two.gender, _.two.cointoss),
+                )
+            )
+            self.print_results(
+                filtered,
+                f"probability my other child is a {other} is",
+            )
+
+
+class OneKnownGenderPlusRandomCoinToss(Run):
+    """
+    Same coin toss, but a random coin toss is generated
+    every time we select a sibling pair. So, for each
+    pair of siblings toss a coin and keep the pair if
+    either child is of the opposite gender and matches
+    the coin that was just tossed.
+    """
+
+    def run(self):
+        def flip_a_coin(choices="heads tails".split()):
+            return choice(choices)
+
+        def filter_func(sib):
+            toss = flip_a_coin()
+            return (known, toss) in (
+                (sib.one.gender, sib.one.cointoss),
+                (sib.two.gender, sib.two.cointoss),
+            )
+
+        for known, other in product(("boy", "girl"), ("girl", "boy")):
+            print(f"I have two children, one is a {known} and "
+                  "you're flipping a coin for every set of kids\n"
+                  "to decide if they're part of our dataset")
+            filtered = self.dataset.filter(filter_func)
+            self.print_results(
+                filtered,
+                f"probability my other child is a {other} is",
+            )
+
+
 def get_commandline() -> Namespace:
     parser = ArgumentParser("simulator for boy/girl problem")
 
@@ -501,6 +555,8 @@ def main():
             DayOfBirthFirstThenKnownGender,
             OneKnownGenderAndARandomDay,
             OneKnownGenderPlusRandomSelection,
+            OneKnownGenderPlusCoinToss,
+            OneKnownGenderPlusRandomCoinToss,
     ):
         action = run(dataset, args.show_raw_counts, args.histogram)
         action.print_header()
